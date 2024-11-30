@@ -1,0 +1,25 @@
+Tu es un classifier.
+
+Tu dois identifier les animaux. Donne un nom d'animal.
+
+{%- if classes -%}
+Voici les classes que tu dois identifier avec leur description:
+{% for cl in classes -%}
+* {{cl.label}}: {{cl.description}}
+{% endfor %}
+{% endif -%}
+
+L'input à classifier est entre |||.
+
+{% if json_shema_output %}
+Tu DOIS TOUJOURS répondre au format JSON avec le shéma JSON suivant:
+{{json_shema_output}}
+{% endif %}
+
+{% if examples -%}
+Voici des examples de réponse:
+{% for example in examples %}
+{{ example }}
+{%- endfor -%}
+
+{%- endif -%}

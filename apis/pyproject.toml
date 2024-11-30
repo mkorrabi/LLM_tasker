@@ -1,0 +1,28 @@
+[tool.poetry]
+name = "llmtasker-api"
+version = "0.2.1"
+description = "Service web api du package llm-tasker"
+authors = [
+    "François Vieille <francois.vieille.ext@groupama.com>",
+]
+packages = [{include = "app"}]
+readme = "README.md"
+package-mode = false
+
+[tool.poetry.dependencies]
+python = "^3.9"
+llm-tasker = {extras = ["api"], version = "^0.2.1"}
+
+[[tool.poetry.source]]
+name = "groupama_pypi"
+url = "http://registry.beluga.intra.groupama.fr/repository/pypi/simple"
+priority = "primary"
+
+[[tool.poetry.source]]
+name = "groupama_pypi_gtec"
+url = "http://registry.beluga.intra.groupama.fr/repository/pypi-gtec/"
+priority = "supplemental"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

@@ -1,0 +1,63 @@
+[tool.poetry]
+name = "llm-tasker"
+version = "0.2.1"
+description = "Package pour executer des tâches avec des LLMs"
+authors = [
+    "François Vieille <francois.vieille.ext@groupama.com>",
+    "Madjid Korrabi <madjid.korrabi@groupama.com>",
+]
+packages = [{include = "llmtasker"}]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.9"
+pydantic = "^2.6.4"
+langchain = "^0.2.0"
+jinja2 = "^3.1.3"
+langchain-openai = "^0.1.1"
+fastapi = {version = "^0.111.0", extras = ["api"]}
+uvicorn = {extras = ["api"], version = "^0.29.0"}
+gradio = {version = "^4.27.0", extras = ["ihm"]}
+pandas = {version = "^2.2.2", extras = ["ihm"]}
+openpyxl = {version = "^3.1.2", extras = ["ihm"]}
+langfuse = {version = "^2.33.0", extras = ["api"]}
+msal = "^1.31.0"
+python-dotenv = "^1.0.1"
+bertopic = "^0.16.4"
+plotly = "^5.24.1"
+nltk = "^3.9.1"
+altair = "^5.5.0"
+chat2plot = "^0.0.11"
+langchain-community = "0.2.5"
+
+[tool.poetry.extras]
+api = ["fastapi", "uvicorn", "langfuse"]
+ihm = ["gradio", "pandas", "openpyxl"]
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.1.1"
+python-dotenv = "^1.0.1"
+pre-commit = "^3.7.0"
+ruff = "^0.3.5"
+pytest-cov = "^5.0.0"
+pytest-mock = "^3.14.0"
+pytest-asyncio = "^0.23.6"
+ipykernel = "^6.29.4"
+pydocstyle = "^6.3.0"
+
+
+[tool.poetry.group.docs.dependencies]
+mkdocs = "^1.5.3"
+mike = "^2.0.0"
+mkdocs-material = "^9.5.17"
+mkdocstrings-python = "^1.9.2"
+pymdown-extensions = "^10.7.1"
+pylint = "^3.2.2"
+
+
+
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

@@ -1,0 +1,20 @@
+Tu es un classifier.
+
+Tu dois identifier les animaux. Donne un nom d'animal.
+
+{%- if classes -%}
+Voici les classes que tu dois identifier avec leur description:
+{% for cl in classes -%}
+{{cl}}
+{% endfor %}
+{% endif -%}
+
+L'input à classifier est entre |||.
+
+{% if examples -%}
+Voici des examples de réponse:
+{% for example in examples %}
+{{ example }}
+{%- endfor -%}
+
+{%- endif -%}

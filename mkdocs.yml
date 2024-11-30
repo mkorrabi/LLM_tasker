@@ -1,0 +1,76 @@
+site_name: IAF - llm-tasker
+site_url: https://git.ra1.intra.groupama.fr/ia-factory/datalab/iaf-packages/llm-tasker
+site_description: Package pour executer des tâches avec des LLMs
+site_author: Groupama - G2S - IAF
+copyright: IAF 2024
+
+repo_url: https://git.ra1.intra.groupama.fr/ia-factory/datalab/iaf-packages/llm-tasker
+repo_name: iaf-packages/llm-tasker
+
+nav:
+  - Accueil: index.md
+  - Exemples tâches:
+    - classification fermée: exemples/task_closed_classification.md
+    - classification fermée multilabels: exemples/task_closed_classification_multilabels.md
+    - classification fermée groupée: exemples/task_closed_grouped_classification.md
+    - instruction personnalisée: exemples/task_custom_instruction.md
+  - API: apis.md
+  - IHM: ihms.md
+  - Références:
+    - docs: references.md
+    - uml: umls.md
+
+theme:
+  name: material
+  language: fr
+  features:
+    - content.tabs.link
+    - content.code.annotate
+    - navigation.sections
+    - content.code.copy
+
+plugins:
+  - mkdocstrings:
+      default_handler: python
+      handlers:
+        python:
+          options:
+            show_source: true
+            show_if_no_docstring: true
+            line_length: 88
+            members_order: "source"
+            merge_init_into_class: false
+            show_root_toc_entry: true
+            show_symbol_type_toc: true
+            show_symbol_type_heading: true
+            show_root_members_full_path: true
+            heading_level: 2
+            show_submodules: true
+            show_bases: false
+            show_label: false
+  - mike:
+      canonical_version: latest
+  - search:
+      lang: fr
+
+
+markdown_extensions:
+  - pymdownx.snippets:
+  - toc:
+      toc_depth: 4
+  - attr_list
+  - md_in_html
+  - admonition
+  - pymdownx.details
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.superfences:
+        # custom_fences:
+        #   - name: mermaid
+        #     class: mermaid
+        #     format: !!python/name:pymdownx.superfences.fence_code_format
+
+extra:
+  version:
+    provider: mike
+    default: latest

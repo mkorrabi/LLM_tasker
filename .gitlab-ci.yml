@@ -1,0 +1,225 @@
+workflow:
+  rules:
+    # si commit pipeline sur une merge request ouverte, ne rien faire. Car une MR pipeline sera déclenché aussi.
+    - if: "$CI_COMMIT_BRANCH && $CI_OPEN_MERGE_REQUESTS"
+      when: never
+    # commit sur une brange protégée ou MR pipeline
+    - if: '$CI_COMMIT_REF_PROTECTED == "true" || $CI_PIPELINE_SOURCE == "merge_request_event"'
+      when: always
+    - when: never
+
+
+variables:
+  POETRY_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pypoetry"
+  PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
+  # IMAGE_PYTHON: imagehub-projets.intra.groupama.fr/gtec-image/python-311-gtec@sha256:0a253627673308b2bf2b096ddc4285755bb66d9623966ba545fd93f852f44bf0
+  IMAGE_PYTHON: imagehub-projets.intra.groupama.fr/gtec-image/python-311-gtec:1.2.0
+  SONAR_HOST_URL: "http://code-quality.beluga.intra.groupama.fr"
+  SONAR_COMPONENT: iaf-llm-tasker
+
+# utiliser une image groupama à terme
+# image: python:3.11
+image: ${IMAGE_PYTHON}
+
+cache:
+  key:
+    files:
+      - poetry.lock
+  paths:
+    - .cache/pypoetry
+    - .cache/pip
+
+stages:
+  - checks
+  - test
+  - build
+  - deploy
+  - deploy_docs
+
+.poetry:
+  variables:
+    GIT_SSL_NO_VERIFY: "true"
+    PYPI_REPOSITORY_URL: "http://registry.beluga.intra.groupama.fr/repository/pypi/simple"
+
+  before_script:
+    - python --version
+    # - pip install --trusted-host registry.beluga.intra.groupama.fr -i $PYPI_REPOSITORY_URL --upgrade pip
+    # - pip install poetry # not need anymore
+    - pip --version
+    - poetry --version
+    # install package
+    - poetry install --with dev --no-interaction
+    - poetry env info
+    # to prevent warning when testing with git
+    - git config --global init.defaultBranch main
+    - git config --global user.email $GITLAB_USER_EMAIL
+    - git config --global user.name $GITLAB_USER_NAME
+
+#################
+# STAGE: CHECKS #
+#################
+# Verifie la version du package et du tag (vX.X.X)
+# se déclenche lorsqu'il y a un tag sur une branche protégée
+check-version:
+  stage: checks
+  extends: .poetry
+  rules:
+    - if: $CI_COMMIT_TAG
+  tags:
+    - docker
+  script:
+    - echo $CI_COMMIT_TAG
+    - echo "Checking tag"
+    - |-
+      PROJECT_VERSION=$(poetry version --short)
+      if [ "v$PROJECT_VERSION" != "$CI_COMMIT_TAG" ]
+      then
+        echo "Project version 'v$PROJECT_VERSION' in pyproject.toml does not match tag '$CI_COMMIT_TAG'."
+        exit 1
+      fi
+
+################
+# STAGE: BUILD #
+################
+# Build le package si un tag est crée
+build package:
+  stage: build
+  extends: .poetry
+  rules:
+    - if: $CI_COMMIT_TAG
+  tags:
+    - docker
+  script:
+    - poetry build
+  artifacts:
+    paths:
+      - dist
+
+
+###############
+# STAGE: TEST #
+###############
+# Tests unitaires
+# Coverage
+# si pas de tag
+# pas sur la branche gl-pages
+tests:
+  stage: test
+  extends: .poetry
+  tags:
+    - docker
+  script:
+    - poetry run pytest --junitxml report.xml --cov-branch --cov=llmtasker --cov-report term  --cov-report xml:coverage.xml tests
+    # A ADAPTER ASAP
+    # - sonar-scanner -Dsonar.projectKey=${SONAR_COMPONENT}
+    #   -Dsonar.python.pylint.reportPath=pylint.txt
+    #   -Dsonar.host.url=${SONAR_HOST_URL}
+    #   -Dsonar.language=py
+    #   -Dsonar.python.xunit.reportPaths=nosetests.xml
+    #   -Dsonar.python.coverage.reportPaths=coverage.xml
+    #   -Dsonar.sources=.
+    #   -Dsonar.coverage.exclusions=**__init__**,tests/**,*.py
+    #   -Dsonar.exclusions=*.xml
+  coverage: '/(?i)total.*? (100(?:\.0+)?\%|[1-9]?\d(?:\.\d+)?\%)$/'
+  artifacts:
+    reports:
+      junit: report.xml
+      coverage_report:
+        coverage_format: cobertura
+        path: coverage.xml
+  rules:
+    - if: '$CI_COMMIT_TAG == null'
+    - if: $CI_COMMIT_BRANCH != 'gl-pages'
+      changes:
+        - .gitlab/cicd.yml
+        - tests/**/*
+        - llmtasker/**/*
+
+###############
+# STAGE: TEST #
+###############
+# Formatting
+# Linting
+# pas sur la branche gl-pages
+code_quality:
+  stage: test
+  extends: .poetry
+  rules:
+    - if: $CI_COMMIT_BRANCH != 'gl-pages'
+  tags:
+    - docker
+  script:
+    - poetry run ruff check --output-format=gitlab --output-file gl-code-quality-report.json -e
+    # - poetry run ruff check --output-format concise --show-fixes
+    - poetry run pre-commit run --all-files --show-diff-on-failure
+    - poetry run pydocstyle llmtasker --convention google --count > docstyle_report.txt || true
+  artifacts:
+    reports:
+      codequality: gl-code-quality-report.json
+    paths:
+      - gl-code-quality-report.json
+      - docstyle_report.txt
+
+
+#################
+# STAGE: DEPLOY #
+#################
+# Deploiement sur pypi_gtec (source)
+# si un tag est déclenché
+deploy to pypi_groupama:
+  stage: deploy
+  tags:
+    - docker
+  rules:
+    - if: $CI_COMMIT_TAG
+  script:
+    # - pip install poetry # not needed anymore
+    - |-
+      # prepare publish
+      poetry config http-basic.groupama_pypi_gtec "${GROUPAMA_PYPI_GTEC_USERNAME}" "${GROUPAMA_PYPI_GTEC_PASSWORD}"
+    - poetry publish -vvv --repository groupama_pypi_gtec
+
+
+.mike_doc:
+  variables:
+    PAGES_BRANCH: gl-pages
+    HTTPS_REMOTE: https://gitlab-ci-token:${GILTAB_ACCESS_TOKEN_DOCS}@${CI_SERVER_HOST}/${CI_PROJECT_PATH}.git
+  tags:
+    - docker
+  before_script:
+    # - pip install poetry # not needed anymore
+    - poetry install --only docs
+    - git config --global user.email $GITLAB_USER_EMAIL
+    - git config --global user.name $GITLAB_USER_NAME
+    - git fetch origin $PAGES_BRANCH && git checkout -b $PAGES_BRANCH origin/$PAGES_BRANCH || git checkout $PAGES_BRANCH || echo "Pages branch not deployed yet."
+    - git checkout $CI_COMMIT_SHA
+  artifacts:
+    paths:
+     - public
+
+######################
+# STAGE: DEPLOY_DOCS #
+######################
+# Maj de la doc
+pages:
+  extends: .mike_doc
+  stage: deploy_docs
+  tags:
+    - docker
+  script:
+    - bash .gitlab/deploy_docs.sh
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+    - if: '$CI_COMMIT_TAG'
+
+# /!\ ne fonctionn pas avec cette version de gitlab
+# include:
+#   # on met à jour la doc (nextrelease) si on pousse sur main
+#   - local: .gitlab/docs_main.yml
+#     rules:
+#       - if: $CI_COMMIT_BRANCH == 'main'
+#   # on met à jour les versions de la doc en fonction
+#   # du nouveau tag qui est crée
+#   - local: .gitlab/docs_release.yml
+#     rules:
+#       - if: $CI_COMMIT_TAG
