@@ -62,6 +62,13 @@ BASE_EXEMPLE = {
 }
 
 
+class loging:
+    def __init__(self):
+        pass
+
+    def create_greeting(self, request: gr.Request):
+        return gr.Markdown(value=f"Thanks for logging in, {request.__getstate__()}")
+
 
 
 class TopicSelectionApp:
@@ -149,12 +156,12 @@ class TopicSelectionApp:
     def update_interface(self,file):
         status, topic_info = self.process_excel_file(file)
         if topic_info is not None:
-            topic_names = topic_info['Name'].tolist()
-            return [
-                topic_info[['Topic', 'Name', 'Percentage']].values.tolist(),
-                gr.CheckboxGroup(choices=topic_names),
-            ]
-        return status, [], gr.CheckboxGroup(choices=[])
+            topic_names = [topic[0] for topic in topic_info['Representation'].tolist()] 
+            print(topic_names)
+            return[ gr.CheckboxGroup(choices=topic_names, visible=True, interactive=True), topic_info]
+                # topic_info[['Topic', 'Name', 'Percentage']].values.tolist(), ,
+            
+        return [gr.CheckboxGroup(visible=True,choices=[]),topic_info]
 
 
     
@@ -199,9 +206,13 @@ class TopicSelectionApp:
         return final_json
             
 
-    def load_example_params(self, file):
-        status, topic_info = self.process_excel_file(file)
-        extract_json=self.convert_df_to_json_format(topic_info)
+    def load_example_params(self, topic_info, selected_topic):
+        # status, topic_info = self.process_excel_file(file)
+        print(topic_info)
+        topic_info["FirstElement"] = topic_info["Representation"].apply(lambda x: x[0].split(',')[0] if x else None)
+        filtered_df = topic_info[topic_info["FirstElement"].isin(selected_topic)]
+        extract_json=self.convert_df_to_json_format(filtered_df)
+        print(extract_json)
         example_params = copy.deepcopy(BASE_EXEMPLE)
         example_params["config_package"]["classes"] = pd.DataFrame(
             extract_json["classes"],
@@ -217,7 +228,7 @@ class TopicSelectionApp:
         values = list(example_params["config_llm"].values()) + list(
             example_params["config_package"].values()
         )
-        return values
+        return values+[ gr.Accordion("Gérer les classes   ", open=True, visible=True)]
 
         # return interface
 
@@ -757,7 +768,7 @@ class ClassificationFermeeInterface(Interface):
         return [
             gr.JSON(
                 label="Les paramètres sauvegardés en Json",
-                visible=True,
+                visible=False,
                 show_label=False,
                 # value=json.dumps(
                 #     data_dict, ensure_ascii=False, indent=True, skipkeys=True
@@ -908,11 +919,9 @@ class viisualisation():
             # 2. Pass a dataframe to draw
             plot = chat2plot(df, chat=llm)
             result = plot.query(query)
-            print(result )
 
             return gr.Plot(value=result.figure, visible=True)
         except Exception as e:
-            print("errro")
             return f"Erreur: {str(e)}"
 
 
@@ -923,6 +932,7 @@ class extract_and_classify(ClassificationFermeeInterface,TopicSelectionApp):
     def body(self):
         app = TopicSelectionApp()
         viz=viisualisation()
+        log=loging()
 
         with gr.Blocks() as interface:
             gr.Markdown("# Analyse et Sélection des Topics")
@@ -934,343 +944,343 @@ class extract_and_classify(ClassificationFermeeInterface,TopicSelectionApp):
                     file_types=[".xlsx", ".xls"]
                 )
                 
-                # Zone de statut
-                status_text = gr.Textbox(
-                    label="Statut",
-                    interactive=False
-                )
+      
             
-            with gr.Row():
+            # with gr.Row():
                 # Tableau des topics
-                topic_df = gr.DataFrame(
-                    label="Topics identifiés",
-                    headers=['Topic', 'Name', 'Percentage'],
-                    interactive=False
-                )
+                # topic_df = gr.DataFrame(
+                #     label="Topics identifiés",
+                #     headers=['Topic', 'Name', 'Percentage'],
+                #     interactive=False
+                # )
             
-            with gr.Row():
+          
                 # Sélection des topics
-                selected_topics = gr.CheckboxGroup(
+            selected_topics = gr.CheckboxGroup(
                     choices=[],
-                    label="Sélectionner les topics pour la classification"
+                    label="Sélectionner les topics pour la classification",
+                    visible=True
+
                 )
+            topic_info=gr.DataFrame(visible=False)
+
             
             # Bouton pour appliquer la sélection
             apply_btn = gr.Button("Appliquer la sélection")
-            result_text = gr.Textbox(label="Résultat de la sélection")
-            extract_json= gr.JSON(
-                    visible=False,
-                    show_label=False,
-                )
+            # result_text = gr.Textbox(label="Résultat de la sélection")
+          
         ####GPT choice #######
 
-        with gr.Tab("Classification fermée "):
-            with gr.Accordion("Paramétrage JSON  ", open=False):
+    
                 ### le fichier JSON #######
-                with gr.Row():
-                    parameters_upload_btn = gr.UploadButton(
-                        label="Charger fichier de paramétrage JSON",
-                        file_count="single",
-                        visible=True,
-                        scale=5,
-                        variant="primary",
-                    )
-                    load_example_params_1 = gr.Button(
-                        value="Charger exemple 1",
-                        visible=True,
-                        scale=1,
-                        variant="secondary",
-                    )
-                    load_example_params_2 = gr.Button(
-                        value="Charger exemple 2",
-                        visible=True,
-                        scale=1,
-                        variant="secondary",
-                    )
-                parameters_text_area = gr.JSON(
-                    label="Les paramètres sauvegardés en Json",
-                    visible=True,
-                    show_label=False,
-                )
+    
+            parameters_upload_btn = gr.UploadButton(
+                label="Charger fichier de paramétrage JSON",
+                file_count="single",
+                visible=False,
+                scale=5,
+                variant="primary",
+            )
+            load_example_params_1 = gr.Button(
+                value="Charger exemple 1",
+                visible=False,
+                scale=1,
+                variant="secondary",
+            )
+            load_example_params_2 = gr.Button(
+                value="Charger exemple 2",
+                visible=False,
+                scale=1,
+                variant="secondary",
+            )
+            parameters_text_area = gr.JSON(
+                label="Les paramètres sauvegardés en Json",
+                visible=False,
+                show_label=False,
+            )
 
-                parameters_download_btn = gr.DownloadButton(
-                    label="Télécharger les paramètres sauvegardés en Json",
-                    visible=True,
-                )
+            parameters_download_btn = gr.DownloadButton(
+                label="Télécharger les paramètres sauvegardés en Json",
+                visible=False,
+            )
 
-            with gr.Accordion("1. Choix du modèle ", open=True):
-                name_model = gr.Radio(
-                    choices=["llama", "Mixtral"],
-                    label="Modèle",
-                    info="Conseil: GPT3.5 est plus rapide et moins coûteux ",
-                    value="GPT3.5",
-                    container=False,
-                )
-
-                #### Paramètres avancés ####
-                with gr.Accordion("Paramètres avancés ", open=False):
-                    # Initialize the checkbox (initially hidden)
-                    temperature = gr.Slider(
-                        0,
-                        1,
-                        value=0,
-                        step=0.1,
-                        label="température",
-                        info="Choisissez la température du modèle",
-                    )
-                    seed = gr.Number(
-                        visible=True,
-                        label="Seed",
-                        info="Avec la même Seed, le modèle fait de son mieux les requêtes répétées avec les mêmes paramètres et devraient renvoyer le même résultat. ",
-                        value=0,
-                        minimum=0,
-                    )
-                    max_tokens = gr.Number(
-                        visible=True,
-                        label="Max_tokens",
-                        info="Choisissez Le nombre maximum de jetons pouvant être générés",
-                        value=2000,
-                        minimum=1,
-                    )
-                    top_p = gr.Slider(
-                        0,
-                        1,
-                        value=1,
-                        step=0.1,
-                        label="top_p",
-                        info="0,1 signifie que seuls les jetons comprenant la masse de probabilité supérieure de 10% sont pris en compte.",
-                    )
-                    frequency_penalty = gr.Slider(
-                        -2,
-                        2,
-                        value=0,
-                        step=0.1,
-                        label="frequency_penalty",
-                        info="Les valeurs positives pénalisent les nouveaux jetons en fonction de leur fréquence existante",
-                    )
-                    presence_penalty = gr.Slider(
-                        -2,
-                        2,
-                        value=0,
-                        step=0.1,
-                        label="presence_penalty",
-                        info=" Les valeurs positives pénalisent les nouveaux jetons en fonction de leur apparition ou non dans le texte jusqu’à présent, ce qui augmente la probabilité que le modèle parle de nouveaux sujets.",
-                    )
-
-            with gr.Accordion("2. Paramètres du prompt ", open=True):
-                with gr.Tab("Instructions "):
-                    #### les instructions #######
-                    with gr.Row():
-                        with gr.Column(scale=3):
-                            instructions = gr.TextArea(
-                                value="Classifie moi la phrase en une seule classe.\nVoici les classes: \n{classes}\n\nVoici les exemples: \n{examples}",
-                                container=False,
-                                show_label=False,
-                                placeholder="Classifie moi la phrase en une seule classe.\nVoici les classes: \n{classes}\n\nVoici les exemples: \n{examples}",
-                                info="Les instructions permettent de définir les règles que le modèle doit suivre",
-                            )
-                        with gr.Column(scale=1):
-                            gr.HTML(
-                                """
-                                <b>Informations</b>
-                                <br/>
-                                <ul>
-                                    <li><code>{classes}</code> permet d'injecter les classes et leur définition.</li>
-                                    <li><code>{examples}</code> permet d'injecter les exemples si <i>Utiliser le role AI pour les exemples</i> n'est pas coché.</li>
-                                </ul>
-                                """
-                            )
-
-                with gr.Tab("Les classes "):
-                    ##### les classes #######
-                    df_classes = gr.DataFrame(
-                        headers=["Classe", "Définition"],
-                        datatype=["str", "str"],
-                        row_count=5,
-                        col_count=(2, "fixed"),
-                    )
-
-                with gr.Tab("Les exemples "):
-                    # ###### Les exemples ###########
-                    df_examples = gr.DataFrame(
-                        headers=["Exemple", "Classe"],
-                        datatype=["str", "str"],
-                        row_count=5,
-                        col_count=(2, "fixed"),
-                    )
-                with gr.Tab("Paramètres avancés "):
-                    # Initialize the checkbox (initially hidden)
-                    use_system_prompt = gr.Checkbox(
-                        visible=True, label="Système prompt"
-                    )
-                    input_in_instructions = gr.Checkbox(
-                        visible=True, label="Input est dans le prompt"
-                    )
-                    use_ai_user_role_for_examples = gr.Checkbox(
-                        visible=True, label="Utiliser le role AI pour les exemples"
-                    )
-                    
-
-            #### update if any  change #######
-
-        
             
-            #### classification avec un input texte ########
+            name_model = gr.Radio(
+                choices=["llama", "Mixtral"],
+                label="Modèle",
+                info="Conseil: GPT3.5 est plus rapide et moins coûteux ",
+                value="GPT3.5",
+                container=False,
+                visible=False,
+            )
 
-            with gr.Accordion("classification avec un input texte", open=False):
-                with gr.Row():
-                    with gr.Column():
-                        input = gr.Textbox(label="Input Text")
-                        classify_btn = gr.Button(value="Classifier")
-
-                    with gr.Column():
-                        output = gr.Textbox(label="classe")
-                        Error = gr.Textbox(label="Error", visible=False)
-
-
-            ###### classification avec un excel ########
-            with gr.Accordion("classification avec un fichier en input ", open=False):
-                file_obj = gr.File(
-                    label="Charger un fichier Excel File",
-                    file_count="single",
-                    file_types=[".xls", ".xlsx"],
-                )
-
-
-            batch_size = gr.Number(
-                visible=True,
-                label="Nombre de requêtes simulatanées",
-                info="Choisissez le nombre de requêtes simulatanées",
-                value=1,
+            
+            # Initialize the checkbox (initially hidden)
+            temperature = gr.Slider(
+                0,
+                1,
+                value=0,
+                step=0.1,
+                label="température",
+                info="Choisissez la température du modèle",
+                visible=False,
+            )
+            seed = gr.Number(
+                visible=False,
+                label="Seed",
+                info="Avec la même Seed, le modèle fait de son mieux les requêtes répétées avec les mêmes paramètres et devraient renvoyer le même résultat. ",
+                value=0,
+                minimum=0,
+            )
+            max_tokens = gr.Number(
+                visible=False,
+                label="Max_tokens",
+                info="Choisissez Le nombre maximum de jetons pouvant être générés",
+                value=2000,
                 minimum=1,
             )
-            multi_labels=gr.Checkbox(
-                        visible=True, label="Multi-labels"
-                    )
-                    
-
-            classify_file_btn = gr.Button(visible=True,value="Classifier")
-
-            ##### les resultats #######
-            df = gr.DataFrame(label="Classes", visible=False)
-            download_excel_btn = gr.DownloadButton(
-                label="Télécharger", visible=False
+            top_p = gr.Slider(
+                0,
+                1,
+                value=1,
+                step=0.1,
+                label="top_p",
+                info="0,1 signifie que seuls les jetons comprenant la masse de probabilité supérieure de 10% sont pris en compte.",
+                visible=False,
+            )
+            frequency_penalty = gr.Slider(
+                -2,
+                2,
+                value=0,
+                step=0.1,
+                label="frequency_penalty",
+                info="Les valeurs positives pénalisent les nouveaux jetons en fonction de leur fréquence existante",
+                visible=False,
+            )
+            presence_penalty = gr.Slider(
+                -2,
+                2,
+                value=0,
+                step=0.1,
+                label="presence_penalty",
+                info=" Les valeurs positives pénalisent les nouveaux jetons en fonction de leur apparition ou non dans le texte jusqu’à présent, ce qui augmente la probabilité que le modèle parle de nouveaux sujets.",
+                visible=False,
             )
 
-            # Création de l'interface Gradio
- 
-            gr.Markdown("# Visualisation des Classes")
+        with gr.Accordion("Gérer les classes   ", open=True, visible=False)  as crd :
             
-            # with gr.Row():
-            #     visualization_choice = gr.Dropdown(
-            #         choices=["Graphique en barres", "Camembert", "Treemap"],
-            #         value="Graphique en barres",
-            #         label="Choisissez le type de visualisation"
-            #     )
-            
-            with gr.Row():
-                inputs=gr.Textbox(label="Entrez votre requête")
-                submite = gr.Button(visible=True,value="submite")
-            outputs = gr.Plot(visible=False)
-            
-            
+            instructions = gr.TextArea(
+                value="Classifie moi la phrase en une seule classe.\nVoici les classes: \n{classes}\n\nVoici les exemples: \n{examples}",
+                container=False,
+                show_label=False,
+                placeholder="Classifie moi la phrase en une seule classe.\nVoici les classes: \n{classes}\n\nVoici les exemples: \n{examples}",
+                info="Les instructions permettent de définir les règles que le modèle doit suivre",
+                visible=False,
+            )
+                    # with gr.Column(scale=1):
+                    #     gr.HTML(
+                    #         """
+                    #         <b>Informations</b>
+                    #         <br/>
+                    #         <ul>
+                    #             <li><code>{classes}</code> permet d'injecter les classes et leur définition.</li>
+                    #             <li><code>{examples}</code> permet d'injecter les exemples si <i>Utiliser le role AI pour les exemples</i> n'est pas coché.</li>
+                    #         </ul>
+                    #         """
+                        # )
 
-
-            # idea: we could use session state to store values one day ...
-            # order is important !
-            user_parameters = [
-                name_model,
-                temperature,
-                max_tokens,
-                seed,
-                top_p,
-                frequency_penalty,
-                presence_penalty,
-                instructions,
-                df_classes,
-                df_examples,
-                use_system_prompt,
-                input_in_instructions,
-                use_ai_user_role_for_examples,
-                batch_size,
-                multi_labels,
-            ]
-           
-            
-
-            for user_param in user_parameters:
-                user_param.change(
-                    self.handle_dump_parameters,
-                    inputs=user_parameters,
-                    outputs=[parameters_text_area, parameters_download_btn],
+            with gr.Tab("Les classes "):
+                ##### les classes #######
+                df_classes = gr.DataFrame(
+                    headers=["Classe", "Définition"],
+                    datatype=["str", "str"],
+                    row_count=5,
+                    col_count=(2, "fixed"),
+                    visible=True
                 )
 
-            #### load examples params ####
-            # load_example_params_1.click(
-            #     self.load_example_params_1, None, user_parameters
-            # )
-            load_example_params_2.click(
-                self.load_example_params_2, None, user_parameters
-            )
-
-            #### Handle upload parameters #######
-
-            parameters_upload_btn.upload(
-                self.init_json, inputs=parameters_upload_btn, outputs=user_parameters
-            )
-
-            #####extract 
-            file_input.change(
-            fn=app.update_interface,    
-            inputs=[file_input],
-            outputs=[topic_df, selected_topics])
-
-            file_input.change(
-            fn=app.load_example_params,
-            inputs=[file_input],
-            outputs=user_parameters)
+            with gr.Tab("Les exemples "):
+                # ###### Les exemples ###########
+                df_examples = gr.DataFrame(
+                    headers=["Exemple", "Classe"],
+                    datatype=["str", "str"],
+                    row_count=5,
+                    col_count=(2, "fixed"),
+                    visible=True
+                )
             
+            # Initialize the checkbox (initially hidden)
+            use_system_prompt = gr.Checkbox(
+                visible=False, label="Système prompt", 
+            )
+            input_in_instructions = gr.Checkbox(
+                visible=False, label="Input est dans le prompt", 
+            )
+            use_ai_user_role_for_examples = gr.Checkbox(
+                visible=False, label="Utiliser le role AI pour les exemples", 
+            )
+                
 
-            file_input.upload(self.check_excel, inputs=file_input, outputs=None)
+    #### update if any  change #######
+
+
+    
+    #### classification avec un input texte ########
+
+        with gr.Accordion("classification avec un input texte", open=False):
+            with gr.Row():
+                with gr.Column():
+                    input = gr.Textbox(label="Input Text")
+                    classify_btn = gr.Button(value="Classifier")
+
+                with gr.Column():
+                    output = gr.Textbox(label="classe")
+                    Error = gr.Textbox(label="Error", visible=False)
+
+
+        ###### classification avec un excel ########
+        with gr.Accordion("classification avec un fichier en input ", open=False):
+            file_obj = gr.File(
+                label="Charger un fichier Excel File",
+                file_count="single",
+                file_types=[".xls", ".xlsx"],
+            )
+
+
+        batch_size = gr.Number(
+            visible=True,
+            label="Nombre de requêtes simulatanées",
+            info="Choisissez le nombre de requêtes simulatanées",
+            value=1,
+            minimum=1,
+        )
+        multi_labels=gr.Checkbox(
+                    visible=True, label="Multi-labels"
+                )
+                
+
+        classify_file_btn = gr.Button(visible=True,value="Classifier")
+
+        ##### les resultats #######
+        df = gr.DataFrame(label="Classes", visible=False)
+        download_excel_btn = gr.DownloadButton(
+            label="Télécharger", visible=False
+        )
+
+        # Création de l'interface Gradio
+
+        gr.Markdown("# Visualisation des Classes")
         
-            # file_input.change(
-            #     self.load_example_params, extract_json, user_parameters)
-            
-            apply_btn.click(
-                self.classify_excel,
-                inputs=[file_input] + user_parameters,
-                outputs=[download_excel_btn, df],
+        # with gr.Row():
+        #     visualization_choice = gr.Dropdown(
+        #         choices=["Graphique en barres", "Camembert", "Treemap"],
+        #         value="Graphique en barres",
+        #         label="Choisissez le type de visualisation"
+        #     )
+        
+        with gr.Row():
+            inputs=gr.Textbox(label="Entrez votre requête")
+            submite = gr.Button(visible=True,value="submite")
+        outputs = gr.Plot(visible=False)
+
+        user_ip = gr.Markdown(value="Not logged in")
+        
+        
+
+
+        # idea: we could use session state to store values one day ...
+        # order is important !
+        user_parameters = [
+            name_model,
+            temperature,
+            max_tokens,
+            seed,
+            top_p,
+            frequency_penalty,
+            presence_penalty,
+            instructions,
+            df_classes,
+            df_examples,
+            use_system_prompt,
+            input_in_instructions,
+            use_ai_user_role_for_examples,
+            batch_size,
+            multi_labels,
+        ]
+
+        interface.load(log.create_greeting, inputs=None, outputs=user_ip)
+        
+        
+
+        for user_param in user_parameters:
+            user_param.change(
+                self.handle_dump_parameters,
+                inputs=user_parameters,
+                outputs=[parameters_text_area, parameters_download_btn],
             )
-            classify_file_btn.click(
-                self.classify_excel,
-                inputs=[file_obj] + user_parameters,
-                outputs=[download_excel_btn, df],
-            )
 
-            
+        #### load examples params ####
+        # load_example_params_1.click(
+        #     self.load_example_params_1, None, user_parameters
+        # )
+        load_example_params_2.click(
+            self.load_example_params_2, None, user_parameters
+        )
 
-            classify_btn.click(
-                self.classify_one,
-                inputs=[input] + user_parameters,
-                outputs=[output, Error],
-            )
+        #### Handle upload parameters #######
 
-            
+        parameters_upload_btn.upload(
+            self.init_json, inputs=parameters_upload_btn, outputs=user_parameters
+        )
 
-            
-            
+        #####extract 
+        file_input.change(
+        fn=app.update_interface,    
+        inputs=[file_input],
+        outputs=[ selected_topics, topic_info])
 
-            # classify_file_btn.click(
-            #     self.classify_excel,
-            #     inputs=[file_obj] + user_parameters,
-            #     outputs=[download_excel_btn, df],
-            # )
-            download_excel_btn.click(
-                self.download_excel_file, outputs=[file_input, download_excel_btn]
-            )
+        apply_btn.click(
+        fn=app.load_example_params,
+        inputs=[topic_info,selected_topics],
+        outputs=user_parameters+[crd])
+        
 
-            submite.click(
-                fn=viz.process_query,
-                inputs=[inputs,df],
-                outputs=outputs
-            )
+        file_input.upload(self.check_excel, inputs=file_input, outputs=None)
+    
+        # file_input.change(
+        #     self.load_example_params, extract_json, user_parameters)
+        
+        
+        classify_file_btn.click(
+            self.classify_excel,
+            inputs=[file_obj] + user_parameters,
+            outputs=[download_excel_btn, df],
+        )
+
+        
+
+        classify_btn.click(
+            self.classify_one,
+            inputs=[input] + user_parameters,
+            outputs=[output, Error],
+        )
+
+        
+
+        
+        
+
+        # classify_file_btn.click(
+        #     self.classify_excel,
+        #     inputs=[file_obj] + user_parameters,
+        #     outputs=[download_excel_btn, df],
+        # )
+        download_excel_btn.click(
+            self.download_excel_file, outputs=[file_input, download_excel_btn]
+        )
+
+        submite.click(
+            fn=viz.process_query,
+            inputs=[inputs,df],
+            outputs=outputs
+        )
