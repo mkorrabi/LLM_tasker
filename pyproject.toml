@@ -10,7 +10,7 @@ packages = [{include = "llmtasker"}]
 readme = "README.md"
 
 [tool.poetry.dependencies]
-python = "^3.9"
+python = ">=3.10,<4.0"
 pydantic = "^2.6.4"
 langchain = "^0.2.0"
 jinja2 = "^3.1.3"
@@ -29,6 +29,8 @@ nltk = "^3.9.1"
 altair = "^5.5.0"
 chat2plot = "^0.0.11"
 langchain-community = "0.2.5"
+django = "^5.1.4"
+redis = "^5.2.1"
 
 [tool.poetry.extras]
 api = ["fastapi", "uvicorn", "langfuse"]

@@ -24,7 +24,9 @@ class Interface:
         self.iface = gr.Blocks(
             analytics_enabled=False,
             title=self.title,
-            theme=gr.Theme(primary_hue="green", secondary_hue="emerald"),
+            theme=gr.themes.Default(
+    primary_hue="violet",
+),
             css="./apps/assets/css/main.css",
         )
         return self.iface
@@ -39,9 +41,9 @@ class Interface:
         raise NotImplementedError()
 
     def build(self):
-        with self.blocks():
+        with self.blocks() as block:
             self.header()
-            self.body()
+            self.body(block)
             self.footer()
 
     @property

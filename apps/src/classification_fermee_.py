@@ -28,7 +28,10 @@ from sklearn.feature_extraction.text import CountVectorizer
 from ast import literal_eval
 from chat2plot import chat2plot
 import os
-
+import redis
+import json
+from typing import Any, Optional
+from typing import List, Dict, Union
 
 BASE_EXEMPLE = {
     "config_llm": {
@@ -67,9 +70,11 @@ class loging:
         pass
 
     def create_greeting(self, request: gr.Request):
-        return gr.Markdown(value=f"Thanks for logging in, {request.__getstate__()}")
+        return [gr.Markdown(visible=True,value=f""" # 🏠 Centre de contrôle 
+                           *{request.__getstate__()["username"]} bienvenue dans votre espace personnel*"""),gr.JSON(visible=False,value=request.__getstate__())]
 
-
+    def get_attribute(self, request: gr.Request):
+        return request.__getstate__()
 
 class TopicSelectionApp:
     def __init__(self):
@@ -157,7 +162,6 @@ class TopicSelectionApp:
         status, topic_info = self.process_excel_file(file)
         if topic_info is not None:
             topic_names = [topic[0] for topic in topic_info['Representation'].tolist()] 
-            print(topic_names)
             return[ gr.CheckboxGroup(choices=topic_names, visible=True, interactive=True), topic_info]
                 # topic_info[['Topic', 'Name', 'Percentage']].values.tolist(), ,
             
@@ -208,11 +212,9 @@ class TopicSelectionApp:
 
     def load_example_params(self, topic_info, selected_topic):
         # status, topic_info = self.process_excel_file(file)
-        print(topic_info)
         topic_info["FirstElement"] = topic_info["Representation"].apply(lambda x: x[0].split(',')[0] if x else None)
         filtered_df = topic_info[topic_info["FirstElement"].isin(selected_topic)]
         extract_json=self.convert_df_to_json_format(filtered_df)
-        print(extract_json)
         example_params = copy.deepcopy(BASE_EXEMPLE)
         example_params["config_package"]["classes"] = pd.DataFrame(
             extract_json["classes"],
@@ -923,18 +925,136 @@ class viisualisation():
             return gr.Plot(value=result.figure, visible=True)
         except Exception as e:
             return f"Erreur: {str(e)}"
+        
 
+class RedisJSONHandler:
+    def __init__(self, host: str = '127.0.0.1', port: int = 6379, db: int = 0):
+        """Initialize Redis connection"""
+        try:
+            self.redis_client = redis.Redis(
+                host=host,
+                port=port,
+                db=db,
+                decode_responses=True  # Automatically decode response bytes to str
+            )
+        except redis.ConnectionError as e:
+            raise Exception(f"Failed to connect to Redis: {e}")
+        
+    def convert_gradio_df_to_dict(self,df):
+        """
+        Convert a pandas DataFrame to a dictionary without using to_dict()
+        
+        Parameters:
+        df (pandas.DataFrame): Input DataFrame
+        
+        Returns:
+        dict: Dictionary with column names as keys and lists of values as values
+        """
+        result = {}
+        
+        # Get column names
+        columns = df.columns.values
+        
+        # Convert each column to a list
+        for col in columns:
+            # Using numpy array conversion and tolist() instead of to_dict()
+            values = df[col].values.tolist()
+            result[col] = values
+            
+        return result
+      
+
+    def save_json(self, key: str, topic_info, selected_topics) -> bool:
+        """
+        Save JSON data to Redis
+        
+        Args:
+            key: Redis key
+            data: Python object to be stored as JSON
+            expiration: Time in seconds until the key expires (optional)
+            
+        Returns:
+            bool: True if successful, False otherwise
+        """
+        try:
+            key=key["username"]
+       
+            # print(data["selected_topics"])
+            # topic_dict = self.convert_gradio_df_to_dict(data["topic_info"]["Representation"])
+            # selected_dict = self.convert_gradio_df_to_dict(data["selected_topics"])
+            
+            
+            # Create the final JSON structure
+            json_data = {
+                "topic_info":[i[0] for i in topic_info["Representation"]],
+                "selected_topics": selected_topics
+            }
+            print(json_data)
+            # Convert Python object to JSON string
+            json_data = json.dumps(json_data)
+            
+            # Save to Redis
+            self.redis_client.set(key, json_data)
+            
+            # Set expiration if provided
+            # if expiration:
+            #     self.redis_client.expire(key, expiration)
+                
+            return True
+            
+        except (json.JSONDecodeError, redis.RedisError) as e:
+            print(f"Error saving data: {e}")
+            return False
+
+    def get_json(self, key: str) -> Optional[Any]:
+        """
+        Retrieve JSON data from Redis
+        
+        Args:
+            key: Redis key
+            
+        Returns:
+            The decoded Python object or None if not found
+        """
+        try:
+            # Get data from Redis
+            data = self.redis_client.get(key)
+            
+            if data is None:
+                return None
+                
+            # Parse JSON string back to Python object
+            return json.loads(data)
+            
+        except (json.JSONDecodeError, redis.RedisError) as e:
+            print(f"Error retrieving data: {e}")
+            return None
 
 
     ############extract 
 class extract_and_classify(ClassificationFermeeInterface,TopicSelectionApp):
 
-    def body(self):
+    def body(self, block):
         app = TopicSelectionApp()
         viz=viisualisation()
         log=loging()
+        handler = RedisJSONHandler()
+ 
 
-        with gr.Blocks() as interface:
+        
+        with gr.Tab("Accueil "):
+            user_ip = gr.Markdown(value="Not logged in", visible=False)
+            request= gr.JSON(visible=False,label="test")
+            block.load(log.create_greeting, inputs=None, outputs=[user_ip,request])
+            # block.load(log.get_attribute, inputs=None, outputs=attributes)
+            
+            
+            
+            
+            # Conteneur principal avec style
+            
+            
+        with gr.Tab("Extraction "):
             gr.Markdown("# Analyse et Sélection des Topics")
             
             with gr.Row():
@@ -944,7 +1064,7 @@ class extract_and_classify(ClassificationFermeeInterface,TopicSelectionApp):
                     file_types=[".xlsx", ".xls"]
                 )
                 
-      
+    
             
             # with gr.Row():
                 # Tableau des topics
@@ -954,12 +1074,12 @@ class extract_and_classify(ClassificationFermeeInterface,TopicSelectionApp):
                 #     interactive=False
                 # )
             
-          
+        
                 # Sélection des topics
             selected_topics = gr.CheckboxGroup(
                     choices=[],
                     label="Sélectionner les topics pour la classification",
-                    visible=True
+                    visible=False
 
                 )
             topic_info=gr.DataFrame(visible=False)
@@ -967,12 +1087,12 @@ class extract_and_classify(ClassificationFermeeInterface,TopicSelectionApp):
             
             # Bouton pour appliquer la sélection
             apply_btn = gr.Button("Appliquer la sélection")
-            # result_text = gr.Textbox(label="Résultat de la sélection")
-          
-        ####GPT choice #######
+        # result_text = gr.Textbox(label="Résultat de la sélection")
+        
+    ####GPT choice #######
 
-    
-                ### le fichier JSON #######
+        with gr.Tab("Classification  "):
+            ### le fichier JSON #######
     
             parameters_upload_btn = gr.UploadButton(
                 label="Charger fichier de paramétrage JSON",
@@ -1067,27 +1187,27 @@ class extract_and_classify(ClassificationFermeeInterface,TopicSelectionApp):
                 visible=False,
             )
 
-        with gr.Accordion("Gérer les classes   ", open=True, visible=False)  as crd :
-            
-            instructions = gr.TextArea(
-                value="Classifie moi la phrase en une seule classe.\nVoici les classes: \n{classes}\n\nVoici les exemples: \n{examples}",
-                container=False,
-                show_label=False,
-                placeholder="Classifie moi la phrase en une seule classe.\nVoici les classes: \n{classes}\n\nVoici les exemples: \n{examples}",
-                info="Les instructions permettent de définir les règles que le modèle doit suivre",
-                visible=False,
-            )
-                    # with gr.Column(scale=1):
-                    #     gr.HTML(
-                    #         """
-                    #         <b>Informations</b>
-                    #         <br/>
-                    #         <ul>
-                    #             <li><code>{classes}</code> permet d'injecter les classes et leur définition.</li>
-                    #             <li><code>{examples}</code> permet d'injecter les exemples si <i>Utiliser le role AI pour les exemples</i> n'est pas coché.</li>
-                    #         </ul>
-                    #         """
-                        # )
+            with gr.Accordion("Gérer les classes   ", open=True, visible=False)  as crd :
+                
+                instructions = gr.TextArea(
+                    value="Classifie moi la phrase en une seule classe.\nVoici les classes: \n{classes}\n\nVoici les exemples: \n{examples}",
+                    container=False,
+                    show_label=False,
+                    placeholder="Classifie moi la phrase en une seule classe.\nVoici les classes: \n{classes}\n\nVoici les exemples: \n{examples}",
+                    info="Les instructions permettent de définir les règles que le modèle doit suivre",
+                    visible=False,
+                )
+                # with gr.Column(scale=1):
+                #     gr.HTML(
+                #         """
+                #         <b>Informations</b>
+                #         <br/>
+                #         <ul>
+                #             <li><code>{classes}</code> permet d'injecter les classes et leur définition.</li>
+                #             <li><code>{examples}</code> permet d'injecter les exemples si <i>Utiliser le role AI pour les exemples</i> n'est pas coché.</li>
+                #         </ul>
+                #         """
+                    # )
 
             with gr.Tab("Les classes "):
                 ##### les classes #######
@@ -1121,69 +1241,69 @@ class extract_and_classify(ClassificationFermeeInterface,TopicSelectionApp):
             )
                 
 
-    #### update if any  change #######
+#### update if any  change #######
 
 
-    
-    #### classification avec un input texte ########
 
-        with gr.Accordion("classification avec un input texte", open=False):
-            with gr.Row():
-                with gr.Column():
-                    input = gr.Textbox(label="Input Text")
-                    classify_btn = gr.Button(value="Classifier")
+#### classification avec un input texte ########
 
-                with gr.Column():
-                    output = gr.Textbox(label="classe")
-                    Error = gr.Textbox(label="Error", visible=False)
+            with gr.Accordion("classification avec un input texte", open=False):
+                with gr.Row():
+                    with gr.Column():
+                        input = gr.Textbox(label="Input Text")
+                        classify_btn = gr.Button(value="Classifier")
+
+                    with gr.Column():
+                        output = gr.Textbox(label="classe")
+                        Error = gr.Textbox(label="Error", visible=False)
 
 
-        ###### classification avec un excel ########
-        with gr.Accordion("classification avec un fichier en input ", open=False):
-            file_obj = gr.File(
-                label="Charger un fichier Excel File",
-                file_count="single",
-                file_types=[".xls", ".xlsx"],
+            ###### classification avec un excel ########
+            with gr.Accordion("classification avec un fichier en input ", open=False):
+                file_obj = gr.File(
+                    label="Charger un fichier Excel File",
+                    file_count="single",
+                    file_types=[".xls", ".xlsx"],
+                )
+
+
+            batch_size = gr.Number(
+                visible=True,
+                label="Nombre de requêtes simulatanées",
+                info="Choisissez le nombre de requêtes simulatanées",
+                value=1,
+                minimum=1,
+            )
+            multi_labels=gr.Checkbox(
+                        visible=True, label="Multi-labels"
+                    )
+                    
+
+            classify_file_btn = gr.Button(visible=True,value="Classifier")
+
+            ##### les resultats #######
+            df = gr.DataFrame(label="Classes", visible=False)
+            download_excel_btn = gr.DownloadButton(
+                label="Télécharger", visible=False
             )
 
+    # Création de l'interface Gradio
+        with gr.Tab("Dashboards "):
+            gr.Markdown("# Visualisation des Classes")
+            
+            # with gr.Row():
+            #     visualization_choice = gr.Dropdown(
+            #         choices=["Graphique en barres", "Camembert", "Treemap"],
+            #         value="Graphique en barres",
+            #         label="Choisissez le type de visualisation"
+            #     )
+            
+            with gr.Row():
+                inputs=gr.Textbox(label="Entrez votre requête")
+                submite = gr.Button(visible=True,value="submite")
+            outputs = gr.Plot(visible=False)
 
-        batch_size = gr.Number(
-            visible=True,
-            label="Nombre de requêtes simulatanées",
-            info="Choisissez le nombre de requêtes simulatanées",
-            value=1,
-            minimum=1,
-        )
-        multi_labels=gr.Checkbox(
-                    visible=True, label="Multi-labels"
-                )
                 
-
-        classify_file_btn = gr.Button(visible=True,value="Classifier")
-
-        ##### les resultats #######
-        df = gr.DataFrame(label="Classes", visible=False)
-        download_excel_btn = gr.DownloadButton(
-            label="Télécharger", visible=False
-        )
-
-        # Création de l'interface Gradio
-
-        gr.Markdown("# Visualisation des Classes")
-        
-        # with gr.Row():
-        #     visualization_choice = gr.Dropdown(
-        #         choices=["Graphique en barres", "Camembert", "Treemap"],
-        #         value="Graphique en barres",
-        #         label="Choisissez le type de visualisation"
-        #     )
-        
-        with gr.Row():
-            inputs=gr.Textbox(label="Entrez votre requête")
-            submite = gr.Button(visible=True,value="submite")
-        outputs = gr.Plot(visible=False)
-
-        user_ip = gr.Markdown(value="Not logged in")
         
         
 
@@ -1208,7 +1328,7 @@ class extract_and_classify(ClassificationFermeeInterface,TopicSelectionApp):
             multi_labels,
         ]
 
-        interface.load(log.create_greeting, inputs=None, outputs=user_ip)
+        
         
         
 
@@ -1243,6 +1363,12 @@ class extract_and_classify(ClassificationFermeeInterface,TopicSelectionApp):
         fn=app.load_example_params,
         inputs=[topic_info,selected_topics],
         outputs=user_parameters+[crd])
+        
+       
+        apply_btn.click(
+        fn=handler.save_json,
+        inputs=[request,topic_info, selected_topics],
+        outputs=None)
         
 
         file_input.upload(self.check_excel, inputs=file_input, outputs=None)
