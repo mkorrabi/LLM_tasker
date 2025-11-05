@@ -1,20 +1,8 @@
 # llm-tasker
 
-> Package IAF pour exécuter des tâches avec des LLMs.
-
-👓📘 [Documentation](http://ia-factory.git-pages.intra.groupama.fr/datalab/iaf-packages/llm-tasker/nextrelease/) (à rédiger)
-
 ## Installation
 
 Depuis le repo gitlab:
-
-```bash
-# via pip (ssh)
-pip install git+git@git.ra1.intra.groupama.fr:ia-factory/datalab/iaf-packages/llm-tasker.git
-```
-
-Depuis pypi groupama:
-_à renseigner_
 
 ```bash
 pip install llm-tasker
