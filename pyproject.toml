@@ -2,10 +2,6 @@
 name = "llm-tasker"
 version = "0.2.1"
 description = "Package pour executer des tâches avec des LLMs"
-authors = [
-    "François Vieille <francois.vieille.ext@groupama.com>",
-    "Madjid Korrabi <madjid.korrabi@groupama.com>",
-]
 packages = [{include = "llmtasker"}]
 readme = "README.md"
 
