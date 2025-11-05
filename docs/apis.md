@@ -14,7 +14,7 @@ L'API permet de réaliser une classification en envoyant un JSON contenant les p
 import httpx
 
 # Define the URL (local)
-# url = "http://digsflrd40.dig.intra.groupama.fr:8008/classify"
+# url = "http://localhost:8008/classify"
 # Define the URL (azure webapp)
 url = "https://app-llm-tasker-api-np-we.azurewebsites.net/classify"
 
