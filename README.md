@@ -64,8 +64,6 @@ for item in outputs:
 
 ## Concepts
 
-_à détailler avec le code associé_
-
 Le package est construit autour de plusieurs concepts:
 
 ➡️ Le LLM: modèle de langue qui permet de traiter du texte de façon "intelligente".
