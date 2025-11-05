@@ -492,13 +492,6 @@ class ClassificationFermeeInterface(Interface):
         #     },
         # }
 
-        # llm = ChatGroq(
-        #     model= model,
-        #     api_key="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",
-        #     temperature=temperature,
-        #     max_tokens=max_tokens,
-        #     timeout=None,
-        #     max_retries=2,
 
         # )
         # llm = OpenAI(model="gpt-3.5-turbo-1106",api_key=os.getenv("OPENAI_API_KEY"))
@@ -896,8 +889,7 @@ class viisualisation():
         
         try:
             
-            os.environ["OPENAI_API_KEY"] = "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"
-
+            os.environ["OPENAI_API_KEY"] = ""
             #transform df colonne output to real list
             df['output'] = [literal_eval(item) if isinstance(item, str) else item for item in df['output']]
 
