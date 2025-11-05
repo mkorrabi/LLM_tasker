@@ -170,9 +170,9 @@ from pydantic import BaseModel, Field
 from msal import ConfidentialClientApplication
 
 # Paramètres de l'application Azure AD
-client_id = "118ac1df-09f0-4cf8-b77d-04fc295b87d6"
-client_secret = "4c58Q~cHmrS6zUsU889K9ID4dC8aAWC76ml8ocr8"
-tenant_id = "b0558a4e-2a71-4b10-a717-8750998ee43c"
+client_id = ""
+client_secret = ""
+tenant_id = ""
 scope = ["api://118ac1df-09f0-4cf8-b77d-04fc295b87d6/.default"]
 
 # Créer une application confidentielle
