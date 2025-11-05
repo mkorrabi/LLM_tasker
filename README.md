@@ -1,5 +1,6 @@
 # llm-tasker
-
+Package permettant d’initier des tâches gérées par un LLM, avec des sorties structurées définies en amont.
+Il est également possible d’utiliser les tâches incluses dans le package, telles que la classification ouverte/fermée, le zero-shot et le few-shot.
 ## Installation
 
 Depuis le repo gitlab:
